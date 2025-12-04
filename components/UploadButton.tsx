@@ -4,10 +4,9 @@ import { Upload, Loader2, Video } from 'lucide-react';
 interface UploadButtonProps {
   onUpload: (file: File) => Promise<void>;
   isProcessing: boolean;
-  isTranscribing?: boolean;
 }
 
-export const UploadButton: React.FC<UploadButtonProps> = ({ onUpload, isProcessing, isTranscribing = false }) => {
+export const UploadButton: React.FC<UploadButtonProps> = ({ onUpload, isProcessing }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
 
@@ -68,15 +67,8 @@ export const UploadButton: React.FC<UploadButtonProps> = ({ onUpload, isProcessi
              <div className="relative">
                 <Loader2 className="w-10 h-10 text-rose-500 animate-spin" />
              </div>
-             <p className="text-sm font-medium text-zinc-300">Processing video...</p>
-           </div>
-        ) : isTranscribing ? (
-           <div className="flex flex-col items-center gap-3">
-             <div className="relative">
-                <Loader2 className="w-10 h-10 text-rose-500 animate-spin" />
-             </div>
-             <p className="text-sm font-medium text-zinc-300">Transcribing audio...</p>
-             <p className="text-xs text-zinc-500">This may take a moment</p>
+             <p className="text-sm font-medium text-zinc-300">Uploading video...</p>
+             <p className="text-xs text-zinc-500">Transcription will happen in the background</p>
            </div>
         ) : (
             <>

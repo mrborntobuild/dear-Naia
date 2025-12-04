@@ -8,8 +8,7 @@ import { PasswordModal } from './components/PasswordModal';
 import { NaiasView } from './components/NaiasView';
 import { VideoEntry } from './types';
 import { extractFrameFromVideo } from './utils/videoHelpers';
-import { fetchVideos, insertVideo, updateVideo, uploadVideoToStorage, uploadThumbnailToStorage } from './services/supabaseService';
-import { transcribeVideo } from './services/transcriptionService';
+import { fetchVideos, insertVideo, updateVideo, uploadVideoToStorage, uploadThumbnailToStorage, triggerVideoProcessing, supabase } from './services/supabaseService';
 import { Heart, Grid3x3 } from 'lucide-react';
 
 const FIRST_VISIT_KEY = 'dear-naia-first-visit';
@@ -18,7 +17,6 @@ const App: React.FC = () => {
   const [videos, setVideos] = useState<VideoEntry[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<VideoEntry | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isTranscribing, setIsTranscribing] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showNaiasView, setShowNaiasView] = useState(false);
@@ -51,6 +49,43 @@ const App: React.FC = () => {
     };
 
     loadVideos();
+  }, []);
+
+  // Subscribe to realtime updates for video transcriptions
+  useEffect(() => {
+    const channel = supabase
+      .channel('video-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'videos',
+          filter: 'transcription=not.is.null',
+        },
+        (payload: any) => {
+          console.log('Video transcription updated:', payload.new);
+          // Update the video in local state when transcription completes
+          setVideos((prev: VideoEntry[]) =>
+            prev.map((v) =>
+              v.id === payload.new.id
+                ? { ...v, transcription: payload.new.transcription }
+                : v
+            )
+          );
+          // Update selected video if it's the one being updated
+          setSelectedVideo((current) =>
+            current?.id === payload.new.id
+              ? { ...current, transcription: payload.new.transcription }
+              : current
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleWelcomeClose = () => {
@@ -96,10 +131,10 @@ const App: React.FC = () => {
       // Create blob URL for immediate playback while uploading
       const blobUrl = URL.createObjectURL(file);
       
-      // 1. Extract a frame for the thumbnail
+      // 1. Extract a frame for the thumbnail (using original file with audio)
       const frameDataUrl = await extractFrameFromVideo(file, 1.0); // snapshot at 1s
       
-      // 2. Upload video to Supabase Storage
+      // 2. Upload original video to Supabase Storage (preserves audio)
       console.log('Uploading video to storage...');
       const storageUrl = await uploadVideoToStorage(file, id);
       
@@ -134,34 +169,17 @@ const App: React.FC = () => {
         // Clean up blob URL
         URL.revokeObjectURL(blobUrl);
 
-        // Transcribe video in the background (non-blocking)
-        setIsTranscribing(true);
-        transcribeVideo(file)
-          .then(async (transcription) => {
-            if (transcription && savedVideo) {
-              // Update video with transcription
-              const updatedVideo = { ...savedVideo, transcription };
-              const dbUpdatedVideo = await updateVideo(updatedVideo);
-              
-              if (dbUpdatedVideo) {
-                // Update local state
-                setVideos((prev) =>
-                  prev.map((v) => (v.id === savedVideo.id ? dbUpdatedVideo : v))
-                );
-                // Update selected video if it's the one we just transcribed
-                setSelectedVideo((current) =>
-                  current?.id === savedVideo.id ? dbUpdatedVideo : current
-                );
-              }
-            }
-          })
-          .catch((error) => {
-            console.error('Transcription failed:', error);
-            // Don't show error to user, transcription is optional
-          })
-          .finally(() => {
-            setIsTranscribing(false);
-          });
+        // Trigger background processing (transcription) via Supabase Edge Function
+        // This runs asynchronously and doesn't block the user
+        console.log('🎬 Starting background transcription via Supabase Edge Function...', {
+          videoId: savedVideo.id,
+          videoUrl: storageUrl.substring(0, 50) + '...'
+        });
+        triggerVideoProcessing(savedVideo.id, storageUrl);
+        
+        // Note: Transcription happens in the Edge Function (process-video)
+        // The Edge Function downloads the video, transcribes it via Hugging Face Whisper,
+        // and updates the database. The UI updates automatically via Supabase Realtime.
       } else {
         // If DB save fails, still add locally but show warning
         console.warn('Failed to save video to database, but added locally');
@@ -171,7 +189,31 @@ const App: React.FC = () => {
       
     } catch (error) {
       console.error("Upload failed", error);
-      alert("Failed to process video. Please try again.");
+      
+      // Show more helpful error messages
+      if (error instanceof Error) {
+        if (error.message.includes('exceeded the maximum allowed size') || error.message.includes('Failed to upload video to storage')) {
+          // Try to extract file size from error or use a default message
+          const fileSizeMatch = error.message.match(/(\d+\.?\d*)\s*MB/);
+          const fileSizeText = fileSizeMatch ? `${fileSizeMatch[1]} MB` : 'your video';
+          
+          alert(
+            `❌ File size too large!\n\n` +
+            `Your video (${fileSizeText}) exceeds the Supabase Storage file size limit.\n\n` +
+            `📋 TO FIX:\n` +
+            `1. Open: https://supabase.com/dashboard/project/dszvvagszjltrssjivmu/storage/settings\n` +
+            `2. Scroll to "Global file size limit"\n` +
+            `3. Increase it to at least 150 MB (or higher)\n` +
+            `4. Click Save\n` +
+            `5. Try uploading again\n\n` +
+            `💡 If you upgraded to Pro, you can set it up to 500 GB!`
+          );
+        } else {
+          alert(`Failed to process video: ${error.message}\n\nPlease try again.`);
+        }
+      } else {
+        alert("Failed to process video. Please try again.");
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -251,7 +293,7 @@ const App: React.FC = () => {
                 <div className="lg:sticky lg:top-24 space-y-6">
                     <div>
                         <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-4 hidden lg:block">Add Memory</h2>
-                        <UploadButton onUpload={handleFileSelect} isProcessing={isProcessing} isTranscribing={isTranscribing} />
+                        <UploadButton onUpload={handleFileSelect} isProcessing={isProcessing} />
                     </div>
                 </div>
             </div>

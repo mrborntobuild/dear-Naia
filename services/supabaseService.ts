@@ -135,17 +135,61 @@ export async function uploadVideoToStorage(file: File, videoId: string): Promise
     const fileName = `${videoId}.${fileExt}`;
     const filePath = `videos/${fileName}`;
 
-    console.log('Uploading video to storage:', filePath);
+    console.log('Uploading video to storage:', filePath, `Size: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
 
-    const { data, error } = await supabase.storage
-      .from('videos')
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false,
-      });
+    // Use resumable upload for files larger than 6MB (recommended by Supabase)
+    const FILE_SIZE_THRESHOLD = 6 * 1024 * 1024; // 6MB in bytes
+    
+    let data, error;
+    
+    if (file.size > FILE_SIZE_THRESHOLD) {
+      console.log('Using resumable upload for large file');
+      // Resumable upload - more reliable for larger files
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('videos')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: file.type,
+        });
+      
+      data = uploadData;
+      error = uploadError;
+    } else {
+      // Standard upload for smaller files
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('videos')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: file.type,
+        });
+      
+      data = uploadData;
+      error = uploadError;
+    }
 
     if (error) {
       console.error('Error uploading video to storage:', error);
+      
+      // Provide helpful error message for file size issues
+      if (error.message?.includes('exceeded the maximum allowed size') || error.message?.includes('EntityTooLarge')) {
+        const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+        console.error(
+          `❌ File size error: Video is ${fileSizeMB} MB, but exceeds Supabase Storage limit.\n` +
+          `\n📋 TO FIX THIS:\n` +
+          `1. Go to: https://supabase.com/dashboard/project/dszvvagszjltrssjivmu/storage/settings\n` +
+          `2. Find "Global file size limit" section\n` +
+          `3. Increase it to at least ${Math.ceil(parseFloat(fileSizeMB) * 1.2)} MB (or higher)\n` +
+          `4. Click Save\n` +
+          `\n💡 Plan limits:\n` +
+          `- Free plan: max 50 MB\n` +
+          `- Pro plan: up to 500 GB\n` +
+          `- Team plan: up to 500 GB\n` +
+          `\nYour video: ${fileSizeMB} MB`
+        );
+      }
+      
       return null;
     }
 
@@ -224,6 +268,59 @@ export async function deleteVideo(videoId: string): Promise<boolean> {
   } catch (error) {
     console.error('Error deleting video:', error);
     return false;
+  }
+}
+
+/**
+ * Triggers background processing for a video (transcription)
+ * This is a fire-and-forget call - the Edge Function processes in the background
+ */
+/**
+ * Triggers background processing for a video (transcription) via Supabase Edge Function
+ * This is a fire-and-forget call - the Edge Function processes in the background
+ */
+export async function triggerVideoProcessing(videoId: string, videoUrl: string): Promise<void> {
+  try {
+    const functionUrl = `${supabaseUrl}/functions/v1/process-video`;
+    
+    console.log(`🎬 Triggering Supabase Edge Function for transcription...`, {
+      videoId,
+      functionUrl,
+      videoUrl: videoUrl.substring(0, 50) + '...'
+    });
+    
+    // Call Edge Function asynchronously (don't wait for response)
+    fetch(functionUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseAnonKey}`,
+        'apikey': supabaseAnonKey, // Some Edge Functions need this
+      },
+      body: JSON.stringify({ videoId, videoUrl }),
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ Error triggering video processing:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorText
+          });
+        } else {
+          const result = await response.json().catch(() => ({}));
+          console.log(`✅ Background transcription started for video ${videoId}`, result);
+        }
+      })
+      .catch((error) => {
+        console.error('❌ Failed to trigger video processing:', error);
+        // Don't throw - this is background processing, failures shouldn't block the user
+      });
+    
+    // Return immediately without waiting
+  } catch (error) {
+    console.error('❌ Error setting up video processing:', error);
+    // Don't throw - background processing failures shouldn't block the user
   }
 }
 

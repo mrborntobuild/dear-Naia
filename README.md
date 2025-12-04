@@ -27,21 +27,21 @@ View your app in AI Studio: https://ai.studio/apps/drive/1GaUEm9kuYXk5g03EmDEaMo
 
 ## Transcription Setup
 
-Videos are automatically transcribed using OpenAI's Whisper model via a Supabase Edge Function that proxies requests to Hugging Face.
+Videos are automatically transcribed using AssemblyAI via a Supabase Edge Function. Transcription happens in the background after upload, so users don't have to wait.
 
-**Optional:** For higher rate limits, set up a Hugging Face token:
-1. Get a free token at: https://huggingface.co/settings/tokens
+**Required:** Set up AssemblyAI API key:
+1. Get a free API key at: https://www.assemblyai.com/app/account (free tier: 5 hours/month)
 2. Add it as a secret in your Supabase project:
    - Go to your Supabase Dashboard → Edge Functions → Secrets
-   - Add secret: `HUGGINGFACE_TOKEN` with your token value
-   - The Edge Function will automatically use this token
+   - Add secret: `ASSEMBLYAI_API_KEY` with your API key value
+   - The Edge Function will automatically use this key
 
-The Edge Function (`transcribe`) is already deployed and ready to use.
+The Edge Function (`process-video`) is already deployed and ready to use.
 
 ## Features
 
 - **Video Upload**: Upload video Messages with drag-and-drop support
-- **Automatic Transcription**: Videos are automatically transcribed using OpenAI's Whisper model via Hugging Face (free, open-source)
+- **Automatic Transcription**: Videos are automatically transcribed using AssemblyAI in the background (supports large files, fast processing)
 - **Timeline View**: Browse all Messages in a beautiful timeline interface
 - **Persistent Storage**: All videos and transcriptions are saved to Supabase database
 - **Edge Function Proxy**: Transcription handled via Supabase Edge Function to avoid CORS issues
