@@ -4,6 +4,12 @@
  */
 export const extractFrameFromVideo = async (videoFile: File, time: number = 1.0): Promise<string> => {
   return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      URL.revokeObjectURL(fileURL);
+      video.remove();
+      reject(new Error('Thumbnail extraction timeout - video may be corrupted or unsupported'));
+    }, 30000); // 30 second timeout
+
     const video = document.createElement('video');
     video.preload = 'metadata';
     video.muted = true;
@@ -11,6 +17,12 @@ export const extractFrameFromVideo = async (videoFile: File, time: number = 1.0)
 
     const fileURL = URL.createObjectURL(videoFile);
     video.src = fileURL;
+
+    const cleanup = () => {
+      clearTimeout(timeout);
+      URL.revokeObjectURL(fileURL);
+      video.remove();
+    };
 
     video.onloadeddata = () => {
       // Seek to the specified time
@@ -34,20 +46,20 @@ export const extractFrameFromVideo = async (videoFile: File, time: number = 1.0)
         if (ctx) {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           const dataURL = canvas.toDataURL('image/jpeg', 0.7);
+          cleanup();
           resolve(dataURL);
         } else {
+          cleanup();
           reject(new Error("Could not get canvas context"));
         }
       } catch (e) {
+        cleanup();
         reject(e);
-      } finally {
-        // Cleanup
-        URL.revokeObjectURL(fileURL);
-        video.remove();
       }
     };
 
     video.onerror = (e) => {
+      cleanup();
       reject(new Error("Error loading video"));
     };
   });

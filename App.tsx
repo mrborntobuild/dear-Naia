@@ -125,18 +125,31 @@ const App: React.FC = () => {
   const handleUpload = async (file: File, personName: string, whoInVideo: string) => {
     setShowUploadModal(false);
     setIsProcessing(true);
+    let blobUrl: string | null = null;
+    
     try {
       const id = crypto.randomUUID();
       
       // Create blob URL for immediate playback while uploading
-      const blobUrl = URL.createObjectURL(file);
+      blobUrl = URL.createObjectURL(file);
       
       // 1. Extract a frame for the thumbnail (using original file with audio)
-      const frameDataUrl = await extractFrameFromVideo(file, 1.0); // snapshot at 1s
+      console.log('Extracting thumbnail...');
+      const frameDataUrl = await Promise.race([
+        extractFrameFromVideo(file, 1.0), // snapshot at 1s
+        new Promise<string>((_, reject) => 
+          setTimeout(() => reject(new Error('Thumbnail extraction timeout')), 30000)
+        )
+      ]) as string;
       
       // 2. Upload original video to Supabase Storage (preserves audio)
       console.log('Uploading video to storage...');
-      const storageUrl = await uploadVideoToStorage(file, id);
+      const storageUrl = await Promise.race([
+        uploadVideoToStorage(file, id),
+        new Promise<string | null>((_, reject) => 
+          setTimeout(() => reject(new Error('Video upload timeout')), 300000) // 5 min timeout
+        )
+      ]) as string | null;
       
       if (!storageUrl) {
         throw new Error('Failed to upload video to storage');
@@ -190,9 +203,23 @@ const App: React.FC = () => {
     } catch (error) {
       console.error("Upload failed", error);
       
+      // Clean up blob URL if it exists
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+      }
+      
       // Show more helpful error messages
       if (error instanceof Error) {
-        if (error.message.includes('exceeded the maximum allowed size') || error.message.includes('Failed to upload video to storage')) {
+        if (error.message.includes('timeout')) {
+          alert(
+            `⏱️ Upload timeout!\n\n` +
+            `The upload is taking too long. This might be due to:\n` +
+            `- Large file size\n` +
+            `- Slow internet connection\n` +
+            `- Server issues\n\n` +
+            `Please try again with a smaller file or check your connection.`
+          );
+        } else if (error.message.includes('exceeded the maximum allowed size') || error.message.includes('Failed to upload video to storage')) {
           // Try to extract file size from error or use a default message
           const fileSizeMatch = error.message.match(/(\d+\.?\d*)\s*MB/);
           const fileSizeText = fileSizeMatch ? `${fileSizeMatch[1]} MB` : 'your video';
