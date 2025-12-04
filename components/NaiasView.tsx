@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { VideoEntry } from '../types';
-import { Calendar, MessageSquare, Info } from 'lucide-react';
+import { Calendar, MessageSquare, Info, Volume2, VolumeX } from 'lucide-react';
 
 interface NaiasViewProps {
   videos: VideoEntry[];
@@ -12,6 +12,7 @@ export const NaiasView: React.FC<NaiasViewProps> = ({ videos, onSelectVideo }) =
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isScrolling, setIsScrolling] = useState(false);
+  const [isMuted, setIsMuted] = useState(false); // Default to unmuted so she can hear audio
 
   // Handle scroll to determine which video is in view
   useEffect(() => {
@@ -152,7 +153,7 @@ export const NaiasView: React.FC<NaiasViewProps> = ({ videos, onSelectVideo }) =
             }}
             src={video.url}
             loop
-            muted
+            muted={isMuted}
             playsInline
             className="w-full h-full object-cover"
             onClick={(e) => {
@@ -167,7 +168,18 @@ export const NaiasView: React.FC<NaiasViewProps> = ({ videos, onSelectVideo }) =
 
           {/* Overlay with metadata */}
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/80 to-transparent p-4 md:p-6 lg:p-8 pointer-events-none">
-            <div className="max-w-2xl mx-auto pointer-events-auto">
+            <div className="max-w-2xl mx-auto pointer-events-auto relative">
+              {/* Volume Control */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsMuted(!isMuted);
+                }}
+                className="absolute right-0 top-0 p-3 rounded-full bg-black/20 backdrop-blur-md hover:bg-black/40 transition-colors text-white/90 hover:text-white"
+              >
+                {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
+              </button>
+
               {/* Title */}
               <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-white mb-2 md:mb-3 tracking-tight drop-shadow-lg">
                 {video.title}
