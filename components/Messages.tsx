@@ -79,7 +79,7 @@ export const Messages: React.FC<MessagesProps> = ({ videos, selectedVideoId, onS
                             {video.title}
                         </h3>
                         <p className="text-xs text-zinc-500 line-clamp-2 leading-relaxed">
-                            {video.description}
+                            {video.transcription || video.description}
                         </p>
                         <p className="text-[10px] text-zinc-600 mt-2 font-mono uppercase tracking-wider">
                             {new Date(video.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}

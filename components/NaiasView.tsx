@@ -179,12 +179,12 @@ export const NaiasView: React.FC<NaiasViewProps> = ({ videos, onSelectVideo }) =
                   <Calendar className="w-3 h-3 md:w-4 md:h-4" />
                   {new Date(video.timestamp).toLocaleDateString()}
                 </span>
-                {video.description && (
+                {(video.transcription || video.description) && (
                   <>
                     <span className="w-1 h-1 bg-zinc-500 rounded-full" />
                     <span className="flex items-center gap-1.5">
                       <Info className="w-3 h-3 md:w-4 md:h-4" />
-                      <span className="line-clamp-1">{video.description}</span>
+                      <span className="line-clamp-1">{video.transcription || video.description}</span>
                     </span>
                   </>
                 )}

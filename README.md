@@ -40,8 +40,8 @@ The Edge Function (`transcribe`) is already deployed and ready to use.
 
 ## Features
 
-- **Video Upload**: Upload video memories with drag-and-drop support
+- **Video Upload**: Upload video Messages with drag-and-drop support
 - **Automatic Transcription**: Videos are automatically transcribed using OpenAI's Whisper model via Hugging Face (free, open-source)
-- **Timeline View**: Browse all memories in a beautiful timeline interface
+- **Timeline View**: Browse all Messages in a beautiful timeline interface
 - **Persistent Storage**: All videos and transcriptions are saved to Supabase database
 - **Edge Function Proxy**: Transcription handled via Supabase Edge Function to avoid CORS issues

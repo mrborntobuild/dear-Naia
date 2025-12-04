@@ -229,7 +229,7 @@ const App: React.FC = () => {
           <div className="flex-1 w-full">
             {isLoading ? (
               <div className="h-[calc(100vh-4rem)] w-full flex items-center justify-center text-zinc-500">
-                <p>Loading memories...</p>
+                <p>Loading Messages...</p>
               </div>
             ) : (
               <NaiasView videos={videos} onSelectVideo={setSelectedVideo} />
@@ -261,12 +261,12 @@ const App: React.FC = () => {
                  <div className="flex items-center justify-between mb-4 px-1">
                     <h2 className="text-lg md:text-xl font-semibold text-white">Messages</h2>
                     <span className="text-xs md:text-sm text-zinc-500">
-                      {isLoading ? 'Loading...' : `${videos.length} memories`}
+                      {isLoading ? 'Loading...' : `${videos.length} Messages`}
                     </span>
                  </div>
                  {isLoading ? (
                    <div className="h-48 w-full border-2 border-dashed border-zinc-800 rounded-xl flex items-center justify-center text-zinc-600">
-                     <p>Loading memories...</p>
+                     <p>Loading Messages...</p>
                    </div>
                  ) : (
                    <Messages 
