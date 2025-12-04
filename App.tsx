@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UploadButton } from './components/UploadButton';
-import { Timeline } from './components/Timeline';
+import { Messages } from './components/Messages';
 import { VideoPlayer } from './components/VideoPlayer';
 import { WelcomeModal } from './components/WelcomeModal';
 import { UploadInfoModal } from './components/UploadInfoModal';
@@ -218,7 +218,7 @@ const App: React.FC = () => {
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-700/50 border border-white/5 transition-colors text-sm font-medium text-zinc-200 hover:text-white"
           >
             <Grid3x3 className="w-4 h-4" />
-            <span>{showNaiasView ? 'Timeline View' : "Naia's View"}</span>
+            <span>{showNaiasView ? 'Messages View' : "Naia's View"}</span>
           </button>
         </div>
       </header>
@@ -236,7 +236,7 @@ const App: React.FC = () => {
             )}
           </div>
         ) : (
-          /* Normal Timeline View */
+          /* Normal Messages View */
           <div className="flex flex-col lg:grid lg:grid-cols-3 gap-8">
             
             {/* Player Section - Only renders if a video is selected */}
@@ -256,10 +256,10 @@ const App: React.FC = () => {
                 </div>
             </div>
 
-            {/* Timeline Section */}
+            {/* Messages Section */}
             <div className="order-2 lg:order-3 lg:col-span-3 w-full">
                  <div className="flex items-center justify-between mb-4 px-1">
-                    <h2 className="text-lg md:text-xl font-semibold text-white">Timeline</h2>
+                    <h2 className="text-lg md:text-xl font-semibold text-white">Messages</h2>
                     <span className="text-xs md:text-sm text-zinc-500">
                       {isLoading ? 'Loading...' : `${videos.length} memories`}
                     </span>
@@ -269,7 +269,7 @@ const App: React.FC = () => {
                      <p>Loading memories...</p>
                    </div>
                  ) : (
-                   <Timeline 
+                   <Messages 
                       videos={videos} 
                       selectedVideoId={selectedVideo?.id || null} 
                       onSelectVideo={setSelectedVideo}

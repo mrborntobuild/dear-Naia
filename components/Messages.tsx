@@ -2,13 +2,13 @@ import React, { useRef, useEffect } from 'react';
 import { VideoEntry } from '../types';
 import { PlayCircle, Clock } from 'lucide-react';
 
-interface TimelineProps {
+interface MessagesProps {
   videos: VideoEntry[];
   selectedVideoId: string | null;
   onSelectVideo: (video: VideoEntry) => void;
 }
 
-export const Timeline: React.FC<TimelineProps> = ({ videos, selectedVideoId, onSelectVideo }) => {
+export const Messages: React.FC<MessagesProps> = ({ videos, selectedVideoId, onSelectVideo }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Auto scroll to end when new video added
@@ -17,7 +17,7 @@ export const Timeline: React.FC<TimelineProps> = ({ videos, selectedVideoId, onS
         // Smooth scroll to left (start) because we prepend new videos usually, 
         // but if we append, we'd scrollWidth. 
         // Let's assume chronological order: newest first (left) or last (right).
-        // For a timeline, usually newest is at the end or beginning. 
+        // For messages, usually newest is at the end or beginning. 
         // Let's stick to simple list behavior.
     }
   }, [videos.length]);
@@ -25,7 +25,7 @@ export const Timeline: React.FC<TimelineProps> = ({ videos, selectedVideoId, onS
   if (videos.length === 0) {
     return (
         <div className="h-48 w-full border-2 border-dashed border-zinc-800 rounded-xl flex items-center justify-center text-zinc-600">
-            <p>Timeline is empty</p>
+            <p>No messages yet</p>
         </div>
     );
   }
@@ -86,7 +86,7 @@ export const Timeline: React.FC<TimelineProps> = ({ videos, selectedVideoId, onS
                         </p>
                     </div>
                     
-                    {/* Connection Line (Visual styling for timeline) */}
+                    {/* Connection Line (Visual styling for messages) */}
                     <div className="absolute top-1/2 -left-4 w-4 h-[2px] bg-zinc-800 -z-10" />
                     <div className="absolute top-1/2 -right-4 w-4 h-[2px] bg-zinc-800 -z-10" />
                 </div>
@@ -96,3 +96,4 @@ export const Timeline: React.FC<TimelineProps> = ({ videos, selectedVideoId, onS
     </div>
   );
 };
+
