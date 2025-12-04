@@ -274,13 +274,6 @@ const App: React.FC = () => {
             <span className="text-xl font-bold tracking-tight text-zinc-100">
               Dear Naia
             </span>
-            {/* Temporary Test Button - Remove before final prod if desired */}
-            <button 
-              onClick={() => setShowWelcome(true)}
-              className="ml-4 px-2 py-1 text-xs bg-zinc-800 text-zinc-400 rounded hover:text-white"
-            >
-              Test Popup
-            </button>
           </div>
           <button
             onClick={handleNaiaViewClick}
