@@ -135,7 +135,7 @@ const App: React.FC = () => {
       
       // 1. Extract a frame for the thumbnail (non-blocking - continue even if it fails)
       console.log('Extracting thumbnail...');
-      let frameDataUrl: string = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQwIiBoZWlnaHQ9IjM2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNjQwIiBoZWlnaHQ9IjM2MCIgZmlsbD0iIzE4MTgxYiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjQiIGZpbGw9IiM3MzczNzMiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5WaWRlbzwvdGV4dD48L3N2Zz4=';
+      let thumbnailUrl: string = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQwIiBoZWlnaHQ9IjM2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNjQwIiBoZWlnaHQ9IjM2MCIgZmlsbD0iIzE4MTgxYiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjQiIGZpbGw9IiM3MzczNzMiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5WaWRlbzwvdGV4dD48L3N2Zz4=';
       
       // Try to extract thumbnail, but don't let it block upload
       const thumbnailPromise = extractFrameFromVideo(file, 1.0).catch((err) => {
@@ -152,11 +152,35 @@ const App: React.FC = () => {
       );
       
       const extractedThumbnail = await Promise.race([thumbnailPromise, thumbnailTimeout]);
-      if (extractedThumbnail) {
-        frameDataUrl = extractedThumbnail;
-        console.log('✅ Thumbnail extracted successfully');
+      
+      if (extractedThumbnail && extractedThumbnail.startsWith('data:image/')) {
+        // Only upload to storage if it's a valid image format (PNG/JPEG), not SVG
+        const isImageFormat = extractedThumbnail.startsWith('data:image/png') || 
+                              extractedThumbnail.startsWith('data:image/jpeg') ||
+                              extractedThumbnail.startsWith('data:image/jpg');
+        
+        if (isImageFormat) {
+          console.log('✅ Thumbnail extracted successfully, uploading to storage...');
+          try {
+            const uploadedThumbnail = await uploadThumbnailToStorage(extractedThumbnail, id);
+            if (uploadedThumbnail) {
+              thumbnailUrl = uploadedThumbnail;
+              console.log('✅ Thumbnail uploaded to storage');
+            } else {
+              console.warn('⚠️ Thumbnail upload failed, using data URL');
+              thumbnailUrl = extractedThumbnail; // Use extracted thumbnail as data URL
+            }
+          } catch (thumbError) {
+            console.warn('⚠️ Thumbnail upload failed, using data URL:', thumbError);
+            thumbnailUrl = extractedThumbnail; // Use extracted thumbnail as data URL
+          }
+        } else {
+          // If it's not a standard image format, use it as data URL directly
+          console.log('ℹ️ Using extracted thumbnail as data URL');
+          thumbnailUrl = extractedThumbnail;
+        }
       } else {
-        console.log('ℹ️ Using placeholder thumbnail');
+        console.log('ℹ️ Using SVG placeholder thumbnail (stored as data URL)');
       }
       
       // 2. Upload original video to Supabase Storage (preserves audio)
@@ -170,20 +194,6 @@ const App: React.FC = () => {
       
       if (!storageUrl) {
         throw new Error('Failed to upload video to storage');
-      }
-
-      // 3. Upload thumbnail to Supabase Storage (if we have one)
-      let thumbnailUrl = frameDataUrl;
-      if (frameDataUrl && frameDataUrl.startsWith('data:')) {
-        console.log('Uploading thumbnail to storage...');
-        try {
-          const uploadedThumbnail = await uploadThumbnailToStorage(frameDataUrl, id);
-          if (uploadedThumbnail) {
-            thumbnailUrl = uploadedThumbnail;
-          }
-        } catch (thumbError) {
-          console.warn('⚠️ Thumbnail upload failed, using data URL:', thumbError);
-        }
       }
       
       // Use person's name as the title
