@@ -133,21 +133,29 @@ const App: React.FC = () => {
       // Create blob URL for immediate playback while uploading
       blobUrl = URL.createObjectURL(file);
       
-      // 1. Extract a frame for the thumbnail (using original file with audio)
+      // 1. Extract a frame for the thumbnail (non-blocking - continue even if it fails)
       console.log('Extracting thumbnail...');
-      const frameDataUrl = await Promise.race([
-        extractFrameFromVideo(file, 1.0), // snapshot at 1s
-        new Promise<string>((_, reject) => 
-          setTimeout(() => reject(new Error('Thumbnail extraction timeout')), 30000)
-        )
-      ]) as string;
+      let frameDataUrl: string | null = null;
+      try {
+        frameDataUrl = await Promise.race([
+          extractFrameFromVideo(file, 1.0), // snapshot at 1s
+          new Promise<string>((_, reject) => 
+            setTimeout(() => reject(new Error('Thumbnail extraction timeout')), 60000) // Increased to 60s
+          )
+        ]) as string;
+        console.log('✅ Thumbnail extracted successfully');
+      } catch (thumbnailError) {
+        console.warn('⚠️ Thumbnail extraction failed, continuing without thumbnail:', thumbnailError);
+        // Create a placeholder thumbnail
+        frameDataUrl = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQwIiBoZWlnaHQ9IjM2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNjQwIiBoZWlnaHQ9IjM2MCIgZmlsbD0iIzE4MTgxYiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjQiIGZpbGw9IiM3MzczNzMiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5WaWRlbzwvdGV4dD48L3N2Zz4=';
+      }
       
       // 2. Upload original video to Supabase Storage (preserves audio)
       console.log('Uploading video to storage...');
       const storageUrl = await Promise.race([
         uploadVideoToStorage(file, id),
         new Promise<string | null>((_, reject) => 
-          setTimeout(() => reject(new Error('Video upload timeout')), 300000) // 5 min timeout
+          setTimeout(() => reject(new Error('Video upload timeout')), 600000) // 10 min timeout for large files
         )
       ]) as string | null;
       
@@ -155,9 +163,19 @@ const App: React.FC = () => {
         throw new Error('Failed to upload video to storage');
       }
 
-      // 3. Upload thumbnail to Supabase Storage
-      console.log('Uploading thumbnail to storage...');
-      const thumbnailUrl = await uploadThumbnailToStorage(frameDataUrl, id) || frameDataUrl;
+      // 3. Upload thumbnail to Supabase Storage (if we have one)
+      let thumbnailUrl = frameDataUrl;
+      if (frameDataUrl && frameDataUrl.startsWith('data:')) {
+        console.log('Uploading thumbnail to storage...');
+        try {
+          const uploadedThumbnail = await uploadThumbnailToStorage(frameDataUrl, id);
+          if (uploadedThumbnail) {
+            thumbnailUrl = uploadedThumbnail;
+          }
+        } catch (thumbError) {
+          console.warn('⚠️ Thumbnail upload failed, using data URL:', thumbError);
+        }
+      }
       
       // Use person's name as the title
       const videoTitle = `${personName}'s Message`;
