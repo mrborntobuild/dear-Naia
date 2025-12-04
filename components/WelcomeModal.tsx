@@ -65,7 +65,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose }) => {
                 Naia is graduating from <strong>Georgia Tech</strong> on <strong>December 11th at 4 PM</strong>!
               </p>
               <p>
-                We're collecting video messages to surprise her at her graduation dinner. Please record a short video sharing your congratulations, a favorite memory, or your best advice for her next chapter.
+                We're collecting video messages to surprise her at her graduation dinner. Please record a short video sharing your congratulations or your best advice for her next chapter. Feel free to also add memories you have of her.
               </p>
               <p className="text-purple-400/90 font-medium">
                 Let's make her graduation celebration unforgettable!
