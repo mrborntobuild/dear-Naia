@@ -8,6 +8,7 @@ import { PasswordModal } from './components/PasswordModal';
 import { NaiasView } from './components/NaiasView';
 import { VideoEntry } from './types';
 import { extractFrameFromVideo } from './utils/videoHelpers';
+import { PLACEHOLDER_THUMBNAIL } from './utils/constants';
 import { fetchVideos, insertVideo, updateVideo, uploadVideoToStorage, uploadThumbnailToStorage, triggerVideoProcessing, supabase } from './services/supabaseService';
 import { Heart, Grid3x3 } from 'lucide-react';
 
@@ -136,7 +137,7 @@ const App: React.FC = () => {
       // 1. Extract a frame for the thumbnail (non-blocking - continue even if it fails)
       console.log('Extracting thumbnail...');
       // Default thumbnail: Purple heart on dark background
-      let thumbnailUrl: string = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQwIiBoZWlnaHQ9IjM2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNjQwIiBoZWlnaHQ9IjM2MCIgZmlsbD0iIzE4MTgxYiIvPjxzdmcgeD0iMjcwIiB5PSIxMzAiIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9IiNhODU1ZjciPjxwYXRoIGQ9Ik0yMC44NCA0LjYxYTUuNSA1LjUgMCAwIDAtNy43OCAwTDEyIDUuNjdsLTEuMDYtMS4wNmE1LjUgNS41IDAgMCAwLTcuNzggNy43OGwxLjA2IDEuMDZMMTIgMjEuMjNsNy43OC03Ljc4IDEuMDYtMS4wNmE1LjUgNS41IDAgMCAwIDAtNy43OHoiLz48L3N2Zz48L3N2Zz4=';
+      let thumbnailUrl: string = PLACEHOLDER_THUMBNAIL;
       
       // Try to extract thumbnail, but don't let it block upload
       const thumbnailPromise = extractFrameFromVideo(file, 1.0).catch((err) => {
