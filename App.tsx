@@ -134,56 +134,10 @@ const App: React.FC = () => {
       // Create blob URL for immediate playback while uploading
       blobUrl = URL.createObjectURL(file);
       
-      // 1. Extract a frame for the thumbnail (non-blocking - continue even if it fails)
-      console.log('Extracting thumbnail...');
+      // 1. Use default purple heart thumbnail (skip extraction to be safe/faster)
+      console.log('Using default thumbnail...');
       // Default thumbnail: Purple heart on dark background
       let thumbnailUrl: string = PLACEHOLDER_THUMBNAIL;
-      
-      // Try to extract thumbnail, but don't let it block upload
-      const thumbnailPromise = extractFrameFromVideo(file, 1.0).catch((err) => {
-        console.warn('⚠️ Thumbnail extraction failed, using placeholder:', err.message);
-        return null;
-      });
-      
-      // Race between thumbnail extraction and a timeout
-      const thumbnailTimeout = new Promise<string | null>((resolve) => 
-        setTimeout(() => {
-          console.warn('⚠️ Thumbnail extraction taking too long, using placeholder');
-          resolve(null);
-        }, 15000) // 15 second timeout - don't wait too long
-      );
-      
-      const extractedThumbnail = await Promise.race([thumbnailPromise, thumbnailTimeout]);
-      
-      if (extractedThumbnail && extractedThumbnail.startsWith('data:image/')) {
-        // Only upload to storage if it's a valid image format (PNG/JPEG), not SVG
-        const isImageFormat = extractedThumbnail.startsWith('data:image/png') || 
-                              extractedThumbnail.startsWith('data:image/jpeg') ||
-                              extractedThumbnail.startsWith('data:image/jpg');
-        
-        if (isImageFormat) {
-          console.log('✅ Thumbnail extracted successfully, uploading to storage...');
-          try {
-            const uploadedThumbnail = await uploadThumbnailToStorage(extractedThumbnail, id);
-            if (uploadedThumbnail) {
-              thumbnailUrl = uploadedThumbnail;
-              console.log('✅ Thumbnail uploaded to storage');
-            } else {
-              console.warn('⚠️ Thumbnail upload failed, using data URL');
-              thumbnailUrl = extractedThumbnail; // Use extracted thumbnail as data URL
-            }
-          } catch (thumbError) {
-            console.warn('⚠️ Thumbnail upload failed, using data URL:', thumbError);
-            thumbnailUrl = extractedThumbnail; // Use extracted thumbnail as data URL
-          }
-        } else {
-          // If it's not a standard image format, use it as data URL directly
-          console.log('ℹ️ Using extracted thumbnail as data URL');
-          thumbnailUrl = extractedThumbnail;
-        }
-      } else {
-        console.log('ℹ️ Using SVG placeholder thumbnail (stored as data URL)');
-      }
       
       // 2. Upload original video to Supabase Storage (preserves audio)
       console.log('Uploading video to storage...');
