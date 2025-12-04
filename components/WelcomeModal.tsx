@@ -57,25 +57,25 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose }) => {
           {/* Message */}
           <div className="text-center space-y-4">
             <h2 className="text-2xl md:text-3xl font-bold text-zinc-100">
-              Welcome
+              Celebrate Naia! 🎓
             </h2>
             
             <div className="space-y-3 text-zinc-300 leading-relaxed">
               <p>
-                If you're seeing this, you're someone special to Naia—a friend or family member who means the world to her.
+                Naia is graduating from <strong>Georgia Tech</strong> on <strong>December 11th at 4 PM</strong>!
               </p>
               <p>
-                This is a place to share your love and support. Please record a video with a message that will help her keep going, remind her how much she's loved, or share a memory that brings joy.
+                We're collecting video messages to surprise her at her graduation dinner. Please record a short video sharing your congratulations, a favorite memory, or your best advice for her next chapter.
               </p>
               <p className="text-rose-400/90 font-medium">
-                Your words have power. Let's fill this space with encouragement and hope.
+                Let's make her graduation celebration unforgettable!
               </p>
             </div>
 
             {/* CTA */}
             <div className="pt-4 flex items-center justify-center gap-2 text-sm text-zinc-400">
               <Video className="w-4 h-4" />
-              <span>Click the upload button above to get started</span>
+              <span>Click the upload button above to add your message</span>
             </div>
           </div>
 
