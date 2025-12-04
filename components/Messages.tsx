@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { VideoEntry } from '../types';
-import { Play, Clock, Heart } from 'lucide-react';
+import { Play, Clock, Heart, Video } from 'lucide-react';
 import { formatDuration } from '../utils/videoHelpers';
 
 interface MessagesProps {
@@ -8,6 +8,27 @@ interface MessagesProps {
   selectedVideoId: string | null;
   onSelectVideo: (video: VideoEntry) => void;
 }
+
+const VideoThumbnail = ({ video }: { video: VideoEntry }) => {
+  const [hasError, setHasError] = useState(false);
+
+  if (!video.thumbnail || hasError) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-zinc-800">
+        <Heart className="w-8 h-8 text-purple-500 fill-current" />
+      </div>
+    );
+  }
+
+  return (
+    <img 
+      src={video.thumbnail} 
+      alt={video.title} 
+      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+      onError={() => setHasError(true)}
+    />
+  );
+};
 
 export const Messages: React.FC<MessagesProps> = ({ videos, selectedVideoId, onSelectVideo }) => {
   if (videos.length === 0) {
@@ -36,30 +57,7 @@ export const Messages: React.FC<MessagesProps> = ({ videos, selectedVideoId, onS
           >
             {/* Thumbnail Container */}
             <div className="aspect-video bg-zinc-900 relative">
-              {video.thumbnail ? (
-                <img 
-                  src={video.thumbnail} 
-                  alt={video.title} 
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  onError={(e) => {
-                    // If image fails to load, hide it so the fallback shows
-                    e.currentTarget.style.display = 'none';
-                    // Show the fallback container
-                    const parent = e.currentTarget.parentElement;
-                    if (parent) {
-                      const fallback = document.createElement('div');
-                      fallback.className = "w-full h-full flex items-center justify-center bg-zinc-800 absolute inset-0";
-                      // Render heart icon html
-                      fallback.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="#a855f7" stroke="#a855f7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-heart w-8 h-8 text-purple-500 fill-current"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>';
-                      parent.appendChild(fallback);
-                    }
-                  }}
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-zinc-800">
-                  <Heart className="w-8 h-8 text-purple-500 fill-current" />
-                </div>
-              )}
+              <VideoThumbnail video={video} />
               
               {/* Overlay Gradient */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-300" />
