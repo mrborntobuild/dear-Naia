@@ -206,8 +206,8 @@ const App: React.FC = () => {
       <header className="border-b border-white/5 bg-[#0f0f10]/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="bg-rose-500/10 p-2 rounded-lg">
-                <Heart className="w-5 h-5 text-rose-500 fill-current" />
+            <div className="bg-purple-500/10 p-2 rounded-lg">
+                <Heart className="w-5 h-5 text-purple-500 fill-current" />
             </div>
             <span className="text-xl font-bold tracking-tight text-zinc-100">
               Dear Naia

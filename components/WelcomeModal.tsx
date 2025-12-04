@@ -49,8 +49,8 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose }) => {
         <div className="p-8 md:p-10">
           {/* Icon */}
           <div className="flex justify-center mb-6">
-            <div className="bg-rose-500/20 p-4 rounded-full">
-              <Heart className="w-10 h-10 text-rose-500 fill-current" />
+            <div className="bg-purple-500/20 p-4 rounded-full">
+              <Heart className="w-10 h-10 text-purple-500 fill-current" />
             </div>
           </div>
 
