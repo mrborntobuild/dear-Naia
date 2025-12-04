@@ -44,7 +44,7 @@ export const UploadButton: React.FC<UploadButtonProps> = ({ onUpload, isProcessi
     <div 
         className={`
             relative group rounded-2xl border-2 border-dashed transition-all duration-300
-            ${dragActive ? 'border-rose-500 bg-rose-500/10' : 'border-zinc-700 hover:border-zinc-500 bg-zinc-900/50'}
+            ${dragActive ? 'border-purple-500 bg-purple-500/10' : 'border-zinc-700 hover:border-zinc-500 bg-zinc-900/50'}
             ${isProcessing ? 'opacity-50 pointer-events-none' : ''}
         `}
         onDragEnter={handleDrag}
@@ -65,14 +65,14 @@ export const UploadButton: React.FC<UploadButtonProps> = ({ onUpload, isProcessi
         {isProcessing ? (
            <div className="flex flex-col items-center gap-3">
              <div className="relative">
-                <Loader2 className="w-10 h-10 text-rose-500 animate-spin" />
+                <Loader2 className="w-10 h-10 text-purple-500 animate-spin" />
              </div>
              <p className="text-sm font-medium text-zinc-300">Uploading video...</p>
              <p className="text-xs text-zinc-500">Transcription will happen in the background</p>
            </div>
         ) : (
             <>
-                <div className={`p-4 rounded-full mb-3 transition-colors ${dragActive ? 'bg-rose-500/20 text-rose-400' : 'bg-zinc-800 text-zinc-400 group-hover:bg-zinc-700 group-hover:text-zinc-200'}`}>
+                <div className={`p-4 rounded-full mb-3 transition-colors ${dragActive ? 'bg-purple-500/20 text-purple-400' : 'bg-zinc-800 text-zinc-400 group-hover:bg-zinc-700 group-hover:text-zinc-200'}`}>
                     <Upload className="w-8 h-8" />
                 </div>
                 <h3 className="text-lg font-semibold text-zinc-200">Upload Memory</h3>

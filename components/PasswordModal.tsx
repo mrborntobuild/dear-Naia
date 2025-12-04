@@ -85,8 +85,8 @@ export const PasswordModal: React.FC<PasswordModalProps> = ({
         <div className="p-8 md:p-10">
           {/* Icon */}
           <div className="flex justify-center mb-6">
-            <div className="bg-rose-500/20 p-4 rounded-full">
-              <Lock className="w-10 h-10 text-rose-500" />
+            <div className="bg-purple-500/20 p-4 rounded-full">
+              <Lock className="w-10 h-10 text-purple-500" />
             </div>
           </div>
 
@@ -111,7 +111,7 @@ export const PasswordModal: React.FC<PasswordModalProps> = ({
                   setError('');
                 }}
                 placeholder="Enter password"
-                className="w-full px-4 py-3 bg-zinc-800/50 border border-white/10 rounded-lg text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 text-center text-lg tracking-wider"
+                className="w-full px-4 py-3 bg-zinc-800/50 border border-white/10 rounded-lg text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 text-center text-lg tracking-wider"
                 autoFocus
                 autoComplete="off"
               />
@@ -125,7 +125,7 @@ export const PasswordModal: React.FC<PasswordModalProps> = ({
               <button
                 type="submit"
                 disabled={!password.trim()}
-                className="w-full px-6 py-3 bg-rose-500 hover:bg-rose-600 disabled:bg-zinc-700 disabled:text-zinc-500 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors shadow-lg shadow-rose-500/20"
+                className="w-full px-6 py-3 bg-purple-500 hover:bg-purple-600 disabled:bg-zinc-700 disabled:text-zinc-500 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors shadow-lg shadow-purple-500/20"
               >
                 Unlock
               </button>

@@ -52,7 +52,7 @@ export const UploadInfoModal: React.FC<UploadInfoModalProps> = ({
               value={personName}
               onChange={(e) => setPersonName(e.target.value)}
               placeholder="Enter your name"
-              className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
+              className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
               required
               autoFocus
             />
@@ -71,7 +71,7 @@ export const UploadInfoModal: React.FC<UploadInfoModalProps> = ({
               value={whoInVideo}
               onChange={(e) => setWhoInVideo(e.target.value)}
               placeholder="e.g., Just me, Me and my family, Naia and I..."
-              className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
+              className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
               required
             />
             <p className="mt-1 text-xs text-zinc-500">
@@ -90,7 +90,7 @@ export const UploadInfoModal: React.FC<UploadInfoModalProps> = ({
             <button
               type="submit"
               disabled={!personName.trim() || !whoInVideo.trim()}
-              className="flex-1 px-4 py-2 bg-rose-500 hover:bg-rose-600 disabled:bg-zinc-700 disabled:text-zinc-500 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-medium"
+              className="flex-1 px-4 py-2 bg-purple-500 hover:bg-purple-600 disabled:bg-zinc-700 disabled:text-zinc-500 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-medium"
             >
               Upload Video
             </button>

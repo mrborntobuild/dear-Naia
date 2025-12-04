@@ -67,7 +67,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose }) => {
               <p>
                 We're collecting video messages to surprise her at her graduation dinner. Please record a short video sharing your congratulations, a favorite memory, or your best advice for her next chapter.
               </p>
-              <p className="text-rose-400/90 font-medium">
+              <p className="text-purple-400/90 font-medium">
                 Let's make her graduation celebration unforgettable!
               </p>
             </div>
@@ -83,7 +83,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose }) => {
           <div className="mt-8 flex justify-center">
             <button
               onClick={handleClose}
-              className="px-6 py-3 bg-rose-500 hover:bg-rose-600 text-white font-medium rounded-lg transition-colors shadow-lg shadow-rose-500/20"
+              className="px-6 py-3 bg-purple-500 hover:bg-purple-600 text-white font-medium rounded-lg transition-colors shadow-lg shadow-purple-500/20"
             >
               Got it
             </button>

@@ -194,7 +194,7 @@ export const NaiasView: React.FC<NaiasViewProps> = ({ videos, onSelectVideo }) =
               {video.transcription && (
                 <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-white/10">
                   <div className="flex items-start gap-2 text-zinc-100">
-                    <MessageSquare className="w-4 h-4 md:w-5 md:h-5 mt-0.5 text-rose-400 shrink-0" />
+                    <MessageSquare className="w-4 h-4 md:w-5 md:h-5 mt-0.5 text-purple-400 shrink-0" />
                     <p className="text-xs md:text-sm lg:text-base leading-relaxed line-clamp-2 md:line-clamp-3 drop-shadow-md">
                       {video.transcription}
                     </p>
