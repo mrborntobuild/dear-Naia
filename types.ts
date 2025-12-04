@@ -6,6 +6,7 @@ export interface VideoEntry {
   description: string;
   timestamp: number;
   durationString: string;
+  transcription?: string; // Transcribed text from the video
 }
 
 export interface VideoAnalysisResult {

@@ -1,0 +1,5 @@
+# Supabase Edge Functions Configuration
+
+[functions.transcribe]
+verify_jwt = false
+

@@ -1,6 +1,6 @@
 import React from 'react';
 import { VideoEntry } from '../types';
-import { Play, Calendar, Info } from 'lucide-react';
+import { Play, Calendar, Info, MessageSquare } from 'lucide-react';
 
 interface VideoPlayerProps {
   video: VideoEntry | null;
@@ -42,10 +42,27 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ video }) => {
             <span className="w-1 h-1 bg-zinc-600 rounded-full" />
             <span>{video.durationString}</span>
         </div>
-        <div className="flex items-start gap-2 text-zinc-300 leading-relaxed text-sm md:text-base">
+        {video.description && (
+          <div className="flex items-start gap-2 text-zinc-300 leading-relaxed text-sm md:text-base mb-4">
             <Info className="w-4 h-4 md:w-5 md:h-5 mt-0.5 text-rose-400 shrink-0" />
             <p>{video.description}</p>
-        </div>
+          </div>
+        )}
+        
+        {/* Transcription */}
+        {video.transcription && (
+          <div className="mt-4 pt-4 border-t border-white/5">
+            <div className="flex items-start gap-2 text-zinc-200 leading-relaxed text-sm md:text-base">
+              <MessageSquare className="w-4 h-4 md:w-5 md:h-5 mt-0.5 text-rose-400 shrink-0" />
+              <div className="flex-1">
+                <h3 className="text-xs md:text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+                  Transcription
+                </h3>
+                <p className="text-zinc-300 whitespace-pre-wrap">{video.transcription}</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
