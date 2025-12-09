@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { VideoEntry } from '../types';
+import { VideoEntry, ArticleEntry, ImageEntry } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://dszvvagszjltrssjivmu.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzenZ2YWdzempsdHJzc2ppdm11Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3OTc5NzIsImV4cCI6MjA4MDM3Mzk3Mn0.oDzR-JpFMSQStjpiJDVpJYpkkLEJHjkxVNDcNe85ng8';
@@ -135,61 +135,29 @@ export async function uploadVideoToStorage(file: File, videoId: string): Promise
     const fileName = `${videoId}.${fileExt}`;
     const filePath = `videos/${fileName}`;
 
-    console.log('Uploading video to storage:', filePath, `Size: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
+    const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
 
-    // Use resumable upload for files larger than 6MB (recommended by Supabase)
-    const FILE_SIZE_THRESHOLD = 6 * 1024 * 1024; // 6MB in bytes
-    
-    let data, error;
-    
-    if (file.size > FILE_SIZE_THRESHOLD) {
-      console.log('Using resumable upload for large file');
-      // Resumable upload - more reliable for larger files
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('videos')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false,
-          contentType: file.type,
-        });
-      
-      data = uploadData;
-      error = uploadError;
-    } else {
-      // Standard upload for smaller files
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('videos')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false,
-          contentType: file.type,
-        });
-      
-      data = uploadData;
-      error = uploadError;
-    }
+    console.log(`Uploading video to storage: ${filePath} (Size: ${fileSizeMB} MB)`);
+
+    // Simple, reliable upload for any file size (up to 500GB limit you set)
+    const { data, error } = await supabase.storage
+      .from('videos')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type,
+      });
 
     if (error) {
       console.error('Error uploading video to storage:', error);
       
-      // Provide helpful error message for file size issues
+      // Keep this helpful error message just in case
       if (error.message?.includes('exceeded the maximum allowed size') || error.message?.includes('EntityTooLarge')) {
-        const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
         console.error(
           `❌ File size error: Video is ${fileSizeMB} MB, but exceeds Supabase Storage limit.\n` +
-          `\n📋 TO FIX THIS:\n` +
-          `1. Go to: https://supabase.com/dashboard/project/dszvvagszjltrssjivmu/storage/settings\n` +
-          `2. Find "Global file size limit" section\n` +
-          `3. Increase it to at least ${Math.ceil(parseFloat(fileSizeMB) * 1.2)} MB (or higher)\n` +
-          `4. Click Save\n` +
-          `\n💡 Plan limits:\n` +
-          `- Free plan: max 50 MB\n` +
-          `- Pro plan: up to 500 GB\n` +
-          `- Team plan: up to 500 GB\n` +
-          `\nYour video: ${fileSizeMB} MB`
+          `Global Limit is likely set too low in the dashboard.`
         );
       }
-      
       return null;
     }
 
@@ -272,10 +240,6 @@ export async function deleteVideo(videoId: string): Promise<boolean> {
 }
 
 /**
- * Triggers background processing for a video (transcription)
- * This is a fire-and-forget call - the Edge Function processes in the background
- */
-/**
  * Triggers background processing for a video (transcription) via Supabase Edge Function
  * This is a fire-and-forget call - the Edge Function processes in the background
  */
@@ -324,3 +288,162 @@ export async function triggerVideoProcessing(videoId: string, videoUrl: string):
   }
 }
 
+// --- Articles ---
+
+export async function fetchArticles(): Promise<ArticleEntry[]> {
+  try {
+    const { data, error } = await supabase
+      .from('articles')
+      .select('*')
+      .order('timestamp', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching articles:', error);
+      return [];
+    }
+
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      link: row.link,
+      title: row.title,
+      description: row.description,
+      timestamp: row.timestamp,
+      posted_by: row.posted_by,
+    }));
+  } catch (error) {
+    console.error('Error fetching articles:', error);
+    return [];
+  }
+}
+
+export async function insertArticle(article: ArticleEntry): Promise<ArticleEntry | null> {
+  const row = {
+    id: article.id,
+    link: article.link,
+    title: article.title,
+    description: article.description,
+    timestamp: article.timestamp,
+    posted_by: article.posted_by || null,
+  };
+
+  try {
+    const { data, error } = await supabase
+      .from('articles')
+      .insert(row)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error inserting article:', error);
+      return null;
+    }
+
+    return {
+      id: data.id,
+      link: data.link,
+      title: data.title,
+      description: data.description,
+      timestamp: data.timestamp,
+      posted_by: data.posted_by,
+    };
+  } catch (error) {
+    console.error('Error inserting article:', error);
+    return null;
+  }
+}
+
+// --- Images ---
+
+export async function fetchImages(): Promise<ImageEntry[]> {
+  try {
+    const { data, error } = await supabase
+      .from('images')
+      .select('*')
+      .order('timestamp', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching images:', error);
+      return [];
+    }
+
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      url: row.url,
+      title: row.title,
+      description: row.description,
+      timestamp: row.timestamp,
+    }));
+  } catch (error) {
+    console.error('Error fetching images:', error);
+    return [];
+  }
+}
+
+export async function insertImage(image: ImageEntry): Promise<ImageEntry | null> {
+  const row = {
+    id: image.id,
+    url: image.url,
+    title: image.title,
+    description: image.description,
+    timestamp: image.timestamp,
+  };
+
+  try {
+    const { data, error } = await supabase
+      .from('images')
+      .insert(row)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error inserting image:', error);
+      return null;
+    }
+
+    return {
+      id: data.id,
+      url: data.url,
+      title: data.title,
+      description: data.description,
+      timestamp: data.timestamp,
+    };
+  } catch (error) {
+    console.error('Error inserting image:', error);
+    return null;
+  }
+}
+
+export async function uploadImageToStorage(file: File, imageId: string): Promise<string | null> {
+  try {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${imageId}.${fileExt}`;
+    // Use images folder in videos bucket to leverage existing policies
+    const filePath = `images/${fileName}`;
+
+    console.log(`Uploading image to storage: ${filePath}`);
+
+    const { data, error } = await supabase.storage
+      .from('videos')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type,
+      });
+
+    if (error) {
+      console.error('Error uploading image to storage:', error);
+      return null;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('videos')
+      .getPublicUrl(filePath);
+
+    console.log('Image uploaded successfully:', urlData.publicUrl);
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error('Error uploading image to storage:', error);
+    return null;
+  }
+}

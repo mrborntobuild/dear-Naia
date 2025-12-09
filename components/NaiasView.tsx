@@ -155,7 +155,7 @@ export const NaiasView: React.FC<NaiasViewProps> = ({ videos, onSelectVideo }) =
             loop
             muted={isMuted}
             playsInline
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain"
             onClick={(e) => {
               const video = e.currentTarget;
               if (video.paused) {
