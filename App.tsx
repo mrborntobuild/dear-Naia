@@ -7,15 +7,18 @@ import { UploadInfoModal } from './components/UploadInfoModal';
 import { NaiasView } from './components/NaiasView';
 import { ArticleCard } from './components/ArticleCard';
 import { ArticleModal } from './components/ArticleModal';
-import { VideoEntry, ArticleEntry, ImageEntry } from './types';
+import { VideoEntry, ArticleEntry, ImageEntry, EventEntry } from './types';
 import { extractFrameFromVideo } from './utils/videoHelpers';
 import { PLACEHOLDER_THUMBNAIL } from './utils/constants';
 import { 
   fetchVideos, insertVideo, updateVideo, uploadVideoToStorage, uploadThumbnailToStorage, triggerVideoProcessing, supabase,
   fetchArticles, insertArticle,
-  fetchImages, insertImage, uploadImageToStorage
+  fetchImages, insertImage, uploadImageToStorage,
+  fetchEvents
 } from './services/supabaseService';
-import { Heart, Grid3x3, Video, BookOpen, Image as ImageIcon } from 'lucide-react';
+import { Heart, Grid3x3, Video, BookOpen, Image as ImageIcon, Calendar, Plus } from 'lucide-react';
+import { Events } from './components/Events';
+import { EventsWall } from './components/EventsWall';
 
 const FIRST_VISIT_KEY = 'dear-naia-first-visit';
 
@@ -23,12 +26,13 @@ const App: React.FC = () => {
   const [videos, setVideos] = useState<VideoEntry[]>([]);
   const [articles, setArticles] = useState<ArticleEntry[]>([]);
   const [images, setImages] = useState<ImageEntry[]>([]);
+  const [events, setEvents] = useState<EventEntry[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<VideoEntry | null>(null);
-  const [activeTab, setActiveTab] = useState<'videos' | 'articles' | 'images'>('videos');
+  const [activeTab, setActiveTab] = useState<'videos' | 'articles' | 'images' | 'events'>('videos');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [showNaiasView, setShowNaiasView] = useState(false);
+  const [showNaiasView, setShowNaiasView] = useState(true);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   
@@ -49,14 +53,16 @@ const App: React.FC = () => {
     const loadData = async () => {
       setIsLoading(true);
       try {
-        const [loadedVideos, loadedArticles, loadedImages] = await Promise.all([
+        const [loadedVideos, loadedArticles, loadedImages, loadedEvents] = await Promise.all([
           fetchVideos(),
           fetchArticles(),
-          fetchImages()
+          fetchImages(),
+          fetchEvents()
         ]);
         setVideos(loadedVideos);
         setArticles(loadedArticles);
         setImages(loadedImages);
+        setEvents(loadedEvents);
       } catch (error) {
         console.error('Failed to load data:', error);
       } finally {
@@ -66,6 +72,16 @@ const App: React.FC = () => {
 
     loadData();
   }, []);
+
+  // Reload events when needed
+  const handleEventsChange = async () => {
+    try {
+      const loadedEvents = await fetchEvents();
+      setEvents(loadedEvents);
+    } catch (error) {
+      console.error('Failed to reload events:', error);
+    }
+  };
 
   // Subscribe to realtime updates for video transcriptions
   useEffect(() => {
@@ -119,8 +135,8 @@ const App: React.FC = () => {
     setPendingFile(null);
   };
 
-  const handleNaiaViewClick = () => {
-    setShowNaiasView((prev) => !prev);
+  const handleAddClick = () => {
+    setShowNaiasView(false);
   };
 
   const handleArticleClick = () => {
@@ -337,13 +353,24 @@ const App: React.FC = () => {
               Dear Naia
             </span>
           </div>
-          <button
-            onClick={handleNaiaViewClick}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-700/50 border border-white/5 transition-colors text-sm font-medium text-zinc-200 hover:text-white"
-          >
-            <Grid3x3 className="w-4 h-4" />
-            <span>{showNaiasView ? 'Messages View' : "Naia's View"}</span>
-          </button>
+          {showNaiasView && (
+            <button
+              onClick={handleAddClick}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-500 hover:bg-purple-600 border border-purple-500/20 transition-colors text-sm font-medium text-white"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add</span>
+            </button>
+          )}
+          {!showNaiasView && (
+            <button
+              onClick={() => setShowNaiasView(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-700/50 border border-white/5 transition-colors text-sm font-medium text-zinc-200 hover:text-white"
+            >
+              <Grid3x3 className="w-4 h-4" />
+              <span>Naia's View</span>
+            </button>
+          )}
         </div>
       </header>
 
@@ -373,6 +400,13 @@ const App: React.FC = () => {
                     >
                         <ImageIcon className="w-3 h-3" />
                         Images
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('events')}
+                        className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-2 ${activeTab === 'events' ? 'bg-white text-black shadow-sm' : 'text-white/70 hover:text-white hover:bg-white/10'}`}
+                    >
+                        <Calendar className="w-3 h-3" />
+                        Events
                     </button>
                 </div>
             </div>
@@ -405,7 +439,7 @@ const App: React.FC = () => {
                         </div>
                     )}
                 </div>
-            ) : (
+            ) : activeTab === 'images' ? (
                 <div className="h-[calc(100vh-4rem)] w-full overflow-y-auto bg-black p-4 pb-20">
                      {images.length === 0 ? (
                         <div className="h-full flex flex-col items-center justify-center text-zinc-500">
@@ -435,7 +469,11 @@ const App: React.FC = () => {
                         </div>
                      )}
                 </div>
-            )}
+            ) : activeTab === 'events' ? (
+                <div className="h-[calc(100vh-4rem)] w-full overflow-y-auto bg-black">
+                    <EventsWall events={events} />
+                </div>
+            ) : null}
           </div>
         ) : (
           /* Normal Messages View */
@@ -480,6 +518,13 @@ const App: React.FC = () => {
                       <ImageIcon className="w-4 h-4" />
                       Images
                   </button>
+                  <button
+                      onClick={() => setActiveTab('events')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${activeTab === 'events' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'}`}
+                  >
+                      <Calendar className="w-4 h-4" />
+                      Events
+                  </button>
               </div>
 
               {activeTab === 'videos' ? (
@@ -497,7 +542,7 @@ const App: React.FC = () => {
                         <div className="lg:sticky lg:top-24 space-y-6">
                             <div>
                                 <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-4 hidden lg:block">Add Memory</h2>
-                                <UploadButton type="video" onUpload={handleFileSelect} isProcessing={isProcessing} />
+                                <UploadButton type="video" onUpload={handleFileSelect} isProcessing={isProcessing} multiple={true} />
                             </div>
                         </div>
                     </div>
@@ -554,14 +599,15 @@ const App: React.FC = () => {
                         </div>
                       )}
                   </div>
-              ) : (
+              ) : activeTab === 'images' ? (
                   <div className="flex flex-col lg:grid lg:grid-cols-3 gap-8">
                       {/* Upload Section */}
                       <div className="order-1 lg:col-span-3 lg:max-w-md lg:mx-auto w-full mb-8">
                           <UploadButton 
                               type="image" 
                               onUpload={handleFileSelect} 
-                              isProcessing={isProcessing} 
+                              isProcessing={isProcessing}
+                              multiple={true}
                           />
                       </div>
                       
@@ -594,7 +640,11 @@ const App: React.FC = () => {
                         </div>
                       )}
                   </div>
-              )}
+              ) : activeTab === 'events' ? (
+                  <div className="w-full">
+                      <Events events={events} onEventsChange={handleEventsChange} />
+                  </div>
+              ) : null}
           </div>
         )}
       </main>

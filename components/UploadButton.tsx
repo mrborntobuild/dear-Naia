@@ -6,9 +6,10 @@ interface UploadButtonProps {
   onClick?: () => void;
   isProcessing: boolean;
   type?: 'video' | 'article' | 'image';
+  multiple?: boolean;
 }
 
-export const UploadButton: React.FC<UploadButtonProps> = ({ onUpload, onClick, isProcessing, type = 'video' }) => {
+export const UploadButton: React.FC<UploadButtonProps> = ({ onUpload, onClick, isProcessing, type = 'video', multiple = false }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
 
@@ -45,8 +46,11 @@ export const UploadButton: React.FC<UploadButtonProps> = ({ onUpload, onClick, i
   };
 
   const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      await onUpload(e.target.files[0]);
+    if (e.target.files && e.target.files.length > 0) {
+      const files = Array.from(e.target.files);
+      for (const file of files) {
+        await onUpload(file);
+      }
       // Reset input
       if (inputRef.current) inputRef.current.value = '';
     }
@@ -68,16 +72,18 @@ export const UploadButton: React.FC<UploadButtonProps> = ({ onUpload, onClick, i
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-        const file = e.dataTransfer.files[0];
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        const files = Array.from(e.dataTransfer.files);
         
-        // Simple type check
-        let isValid = false;
-        if (type === 'video' && file.type.startsWith('video/')) isValid = true;
-        if (type === 'image' && file.type.startsWith('image/')) isValid = true;
-        // Article doesn't support drop anymore
+        // Filter valid files
+        const validFiles = files.filter(file => {
+            if (type === 'video' && file.type.startsWith('video/')) return true;
+            if (type === 'image' && file.type.startsWith('image/')) return true;
+            return false;
+        });
         
-        if (isValid) {
+        // Upload all valid files
+        for (const file of validFiles) {
             await onUpload(file);
         }
     }
@@ -113,6 +119,7 @@ export const UploadButton: React.FC<UploadButtonProps> = ({ onUpload, onClick, i
             onChange={handleChange}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
             disabled={isProcessing}
+            multiple={multiple}
         />
       )}
       
@@ -138,12 +145,17 @@ export const UploadButton: React.FC<UploadButtonProps> = ({ onUpload, onClick, i
                          <span>Click to add a link.</span>
                     ) : (
                         <>
-                            <span className="hidden md:inline">Drag and drop or click to upload.</span>
-                            <span className="md:hidden">Tap to upload.</span>
+                            <span className="hidden md:inline">
+                                {multiple ? 'Drag and drop or click to upload multiple files.' : 'Drag and drop or click to upload.'}
+                            </span>
+                            <span className="md:hidden">
+                                {multiple ? 'Tap to upload multiple files.' : 'Tap to upload.'}
+                            </span>
                         </>
                     )}
                     <span className="block text-zinc-600 text-xs mt-2 flex items-center justify-center gap-1">
                         {getIcon()} {getFormatText()}
+                        {multiple && type !== 'article' && <span className="ml-1 text-purple-400">(Multiple)</span>}
                     </span>
                 </p>
             </>

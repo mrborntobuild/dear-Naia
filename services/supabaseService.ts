@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import * as tus from 'tus-js-client';
-import { VideoEntry, ArticleEntry, ImageEntry } from '../types';
+import { VideoEntry, ArticleEntry, ImageEntry, EventEntry, EventMediaEntry } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://dszvvagszjltrssjivmu.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzenZ2YWdzempsdHJzc2ppdm11Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3OTc5NzIsImV4cCI6MjA4MDM3Mzk3Mn0.oDzR-JpFMSQStjpiJDVpJYpkkLEJHjkxVNDcNe85ng8';
@@ -538,6 +538,247 @@ export async function uploadImageToStorage(file: File, imageId: string): Promise
     return urlData.publicUrl;
   } catch (error) {
     console.error('Error uploading image to storage:', error);
+    return null;
+  }
+}
+
+// --- Events ---
+
+export async function fetchEvents(): Promise<EventEntry[]> {
+  try {
+    const { data, error } = await supabase
+      .from('events')
+      .select(`
+        *,
+        event_media (*)
+      `)
+      .order('date', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching events:', error);
+      return [];
+    }
+
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      date: row.date,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      media: (row.event_media || []).map((media: any) => ({
+        id: media.id,
+        event_id: media.event_id,
+        media_type: media.media_type,
+        media_url: media.media_url,
+        thumbnail: media.thumbnail,
+        title: media.title,
+        description: media.description,
+        uploaded_by: media.uploaded_by,
+        created_at: media.created_at,
+      })),
+    }));
+  } catch (error) {
+    console.error('Error fetching events:', error);
+    return [];
+  }
+}
+
+export async function insertEvent(event: Omit<EventEntry, 'id' | 'created_at' | 'updated_at' | 'media'>): Promise<EventEntry | null> {
+  try {
+    const { data, error } = await supabase
+      .from('events')
+      .insert({
+        title: event.title,
+        description: event.description || null,
+        date: event.date,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error inserting event:', error);
+      return null;
+    }
+
+    return {
+      id: data.id,
+      title: data.title,
+      description: data.description,
+      date: data.date,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+      media: [],
+    };
+  } catch (error) {
+    console.error('Error inserting event:', error);
+    return null;
+  }
+}
+
+export async function updateEvent(event: EventEntry): Promise<EventEntry | null> {
+  try {
+    const { data, error } = await supabase
+      .from('events')
+      .update({
+        title: event.title,
+        description: event.description || null,
+        date: event.date,
+      })
+      .eq('id', event.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating event:', error);
+      return null;
+    }
+
+    // Fetch media for the event
+    const { data: mediaData } = await supabase
+      .from('event_media')
+      .select('*')
+      .eq('event_id', event.id);
+
+    return {
+      id: data.id,
+      title: data.title,
+      description: data.description,
+      date: data.date,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+      media: (mediaData || []).map((media: any) => ({
+        id: media.id,
+        event_id: media.event_id,
+        media_type: media.media_type,
+        media_url: media.media_url,
+        thumbnail: media.thumbnail,
+        title: media.title,
+        description: media.description,
+        uploaded_by: media.uploaded_by,
+        created_at: media.created_at,
+      })),
+    };
+  } catch (error) {
+    console.error('Error updating event:', error);
+    return null;
+  }
+}
+
+export async function deleteEvent(eventId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('events')
+      .delete()
+      .eq('id', eventId);
+
+    if (error) {
+      console.error('Error deleting event:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error deleting event:', error);
+    return false;
+  }
+}
+
+// --- Event Media ---
+
+export async function insertEventMedia(media: Omit<EventMediaEntry, 'id' | 'created_at'>): Promise<EventMediaEntry | null> {
+  try {
+    const { data, error } = await supabase
+      .from('event_media')
+      .insert({
+        event_id: media.event_id,
+        media_type: media.media_type,
+        media_url: media.media_url,
+        thumbnail: media.thumbnail || null,
+        title: media.title || null,
+        description: media.description || null,
+        uploaded_by: media.uploaded_by || null,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error inserting event media:', error);
+      return null;
+    }
+
+    return {
+      id: data.id,
+      event_id: data.event_id,
+      media_type: data.media_type,
+      media_url: data.media_url,
+      thumbnail: data.thumbnail,
+      title: data.title,
+      description: data.description,
+      uploaded_by: data.uploaded_by,
+      created_at: data.created_at,
+    };
+  } catch (error) {
+    console.error('Error inserting event media:', error);
+    return null;
+  }
+}
+
+export async function deleteEventMedia(mediaId: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('event_media')
+      .delete()
+      .eq('id', mediaId);
+
+    if (error) {
+      console.error('Error deleting event media:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error deleting event media:', error);
+    return false;
+  }
+}
+
+export async function uploadEventMediaToStorage(
+  file: File,
+  eventId: string,
+  mediaId: string,
+  mediaType: 'video' | 'image'
+): Promise<string | null> {
+  try {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${mediaId}.${fileExt}`;
+    const folder = mediaType === 'video' ? 'videos' : 'images';
+    const filePath = `events/${eventId}/${folder}/${fileName}`;
+
+    console.log(`Uploading event ${mediaType} to storage: ${filePath}`);
+
+    const { data, error } = await supabase.storage
+      .from('videos')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type,
+      });
+
+    if (error) {
+      console.error('Error uploading event media to storage:', error);
+      return null;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('videos')
+      .getPublicUrl(filePath);
+
+    console.log('Event media uploaded successfully:', urlData.publicUrl);
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error('Error uploading event media to storage:', error);
     return null;
   }
 }
