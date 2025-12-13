@@ -1,10 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
+import * as tus from 'tus-js-client';
 import { VideoEntry, ArticleEntry, ImageEntry } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://dszvvagszjltrssjivmu.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzenZ2YWdzempsdHJzc2ppdm11Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ3OTc5NzIsImV4cCI6MjA4MDM3Mzk3Mn0.oDzR-JpFMSQStjpiJDVpJYpkkLEJHjkxVNDcNe85ng8';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Extract project ID from URL for direct storage hostname
+const projectId = supabaseUrl.match(/https?:\/\/([^.]+)\.supabase\.co/)?.[1] || 'dszvvagszjltrssjivmu';
+const storageUrl = `https://${projectId}.storage.supabase.co`;
 
 // Database types matching our schema
 interface VideoRow {
@@ -125,53 +130,142 @@ export async function updateVideo(video: VideoEntry): Promise<VideoEntry | null>
 
 /**
  * Uploads a video file to Supabase Storage
+ * Uses resumable uploads (TUS) for files larger than 6MB for better reliability
  * @param file - The video file to upload
  * @param videoId - The unique ID for the video
+ * @param onProgress - Optional progress callback
  * @returns The public URL of the uploaded video, or null if upload fails
  */
-export async function uploadVideoToStorage(file: File, videoId: string): Promise<string | null> {
+export async function uploadVideoToStorage(
+  file: File, 
+  videoId: string,
+  onProgress?: (progress: number) => void
+): Promise<string | null> {
   try {
     const fileExt = file.name.split('.').pop();
     const fileName = `${videoId}.${fileExt}`;
     const filePath = `videos/${fileName}`;
 
-    const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+    const fileSizeMB = file.size / 1024 / 1024;
+    const useResumable = fileSizeMB > 6; // Use resumable uploads for files > 6MB
 
-    console.log(`Uploading video to storage: ${filePath} (Size: ${fileSizeMB} MB)`);
+    console.log(`Uploading video to storage: ${filePath} (Size: ${fileSizeMB.toFixed(2)} MB, Method: ${useResumable ? 'Resumable' : 'Standard'})`);
 
-    // Simple, reliable upload for any file size (up to 500GB limit you set)
-    const { data, error } = await supabase.storage
-      .from('videos')
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false,
-        contentType: file.type,
-      });
-
-    if (error) {
-      console.error('Error uploading video to storage:', error);
-      
-      // Keep this helpful error message just in case
-      if (error.message?.includes('exceeded the maximum allowed size') || error.message?.includes('EntityTooLarge')) {
-        console.error(
-          `❌ File size error: Video is ${fileSizeMB} MB, but exceeds Supabase Storage limit.\n` +
-          `Global Limit is likely set too low in the dashboard.`
-        );
-      }
-      return null;
+    if (useResumable) {
+      // Use resumable uploads for larger files
+      return await uploadResumable(file, filePath, onProgress);
+    } else {
+      // Use standard upload for smaller files
+      return await uploadStandard(file, filePath);
     }
-
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from('videos')
-      .getPublicUrl(filePath);
-
-    console.log('Video uploaded successfully:', urlData.publicUrl);
-    return urlData.publicUrl;
   } catch (error) {
     console.error('Error uploading video to storage:', error);
     return null;
   }
+}
+
+/**
+ * Standard upload for smaller files
+ */
+async function uploadStandard(file: File, filePath: string): Promise<string | null> {
+  const { data, error } = await supabase.storage
+    .from('videos')
+    .upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: file.type,
+    });
+
+  if (error) {
+    console.error('Error uploading video to storage:', error);
+    if (error.message?.includes('exceeded the maximum allowed size') || error.message?.includes('EntityTooLarge')) {
+      const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+      console.error(
+        `❌ File size error: Video is ${fileSizeMB} MB, but exceeds Supabase Storage limit.\n` +
+        `Global Limit is likely set too low in the dashboard.`
+      );
+    }
+    return null;
+  }
+
+  // Get public URL
+  const { data: urlData } = supabase.storage
+    .from('videos')
+    .getPublicUrl(filePath);
+
+  console.log('Video uploaded successfully:', urlData.publicUrl);
+  return urlData.publicUrl;
+}
+
+/**
+ * Resumable upload using TUS protocol for larger files
+ */
+async function uploadResumable(
+  file: File, 
+  filePath: string,
+  onProgress?: (progress: number) => void
+): Promise<string | null> {
+  return new Promise((resolve, reject) => {
+    // Get session for authentication
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const upload = new tus.Upload(file, {
+        // Use direct storage hostname for better performance
+        endpoint: `${storageUrl}/storage/v1/upload/resumable`,
+        retryDelays: [0, 3000, 5000, 10000, 20000],
+        headers: {
+          authorization: `Bearer ${session?.access_token || supabaseAnonKey}`,
+          apikey: supabaseAnonKey,
+        },
+        uploadDataDuringCreation: true,
+        removeFingerprintOnSuccess: true,
+        metadata: {
+          bucketName: 'videos',
+          objectName: filePath,
+          contentType: file.type,
+          cacheControl: '3600',
+        },
+        chunkSize: 6 * 1024 * 1024, // 6MB chunks (required by Supabase)
+        onError: function (error) {
+          console.error('Resumable upload failed:', error);
+          reject(error);
+        },
+        onProgress: function (bytesUploaded, bytesTotal) {
+          const percentage = ((bytesUploaded / bytesTotal) * 100).toFixed(2);
+          console.log(`Upload progress: ${percentage}% (${(bytesUploaded / 1024 / 1024).toFixed(2)} MB / ${(bytesTotal / 1024 / 1024).toFixed(2)} MB)`);
+          if (onProgress) {
+            onProgress(Number(percentage));
+          }
+        },
+        onSuccess: function () {
+          console.log('Resumable upload completed successfully');
+          // Get public URL
+          const { data: urlData } = supabase.storage
+            .from('videos')
+            .getPublicUrl(filePath);
+          
+          console.log('Video uploaded successfully:', urlData.publicUrl);
+          resolve(urlData.publicUrl);
+        },
+      });
+
+      // Check for previous uploads to resume
+      upload.findPreviousUploads().then(function (previousUploads) {
+        if (previousUploads.length) {
+          console.log('Resuming previous upload...');
+          upload.resumeFromPreviousUpload(previousUploads[0]);
+        }
+        // Start the upload
+        upload.start();
+      }).catch((error) => {
+        console.error('Error finding previous uploads:', error);
+        // Start fresh upload anyway
+        upload.start();
+      });
+    }).catch((error) => {
+      console.error('Error getting session:', error);
+      reject(error);
+    });
+  });
 }
 
 /**

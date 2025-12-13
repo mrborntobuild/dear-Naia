@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { VideoEntry } from '../types';
 import { Calendar, MessageSquare, Info, Volume2, VolumeX } from 'lucide-react';
 
@@ -13,8 +13,93 @@ export const NaiasView: React.FC<NaiasViewProps> = ({ videos, onSelectVideo }) =
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isScrolling, setIsScrolling] = useState(false);
   const [isMuted, setIsMuted] = useState(false); // Default to unmuted so she can hear audio
+  const [loadedVideos, setLoadedVideos] = useState<Set<string>>(new Set()); // Track which videos are loaded
+  
+  // Detect connection quality for adaptive preloading (memoized to avoid recalculation)
+  const { connectionQuality, preloadCount } = useMemo(() => {
+    const getConnectionQuality = (): 'slow' | 'medium' | 'fast' => {
+      // Use Network Information API if available
+      const connection = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
+      
+      if (connection) {
+        // Check effective connection type
+        const effectiveType = connection.effectiveType;
+        if (effectiveType === 'slow-2g' || effectiveType === '2g') return 'slow';
+        if (effectiveType === '3g') return 'medium';
+        if (effectiveType === '4g') return 'fast';
+        
+        // Check if on cellular (more conservative preloading)
+        if (connection.type === 'cellular' && (connection.downlink || 0) < 2) {
+          return 'slow';
+        }
+        if (connection.type === 'cellular') {
+          return 'medium';
+        }
+        
+        // Check downlink speed
+        if (connection.downlink) {
+          if (connection.downlink < 1.5) return 'slow';
+          if (connection.downlink < 5) return 'medium';
+          return 'fast';
+        }
+      }
+      
+      // Default to medium (balanced approach)
+      return 'medium';
+    };
+    
+    const quality = getConnectionQuality();
+    
+    // Adaptive preload count based on connection
+    const count = quality === 'fast' ? 3 : quality === 'medium' ? 2 : 1;
+    
+    return { connectionQuality: quality, preloadCount: count };
+  }, []); // Only calculate once on mount
 
-  // Handle scroll to determine which video is in view
+  // Load first video immediately on mount (after DOM is ready) with aggressive preloading
+  useEffect(() => {
+    if (videos.length > 0) {
+      // Use requestAnimationFrame to ensure DOM is ready
+      requestAnimationFrame(() => {
+        const firstVideo = videoRefs.current.get(videos[0].id);
+        if (firstVideo && !firstVideo.src) {
+          firstVideo.preload = 'auto'; // Preload fully for instant playback
+          firstVideo.src = videos[0].url;
+          setLoadedVideos(prev => new Set(prev).add(videos[0].id));
+          
+          // Auto-play first video when it's ready
+          const playWhenReady = () => {
+            if (firstVideo.readyState >= 3) {
+              firstVideo.play().catch(() => {
+                // Auto-play might be blocked, that's okay
+              });
+            } else {
+              firstVideo.addEventListener('canplay', () => {
+                firstVideo.play().catch(() => {});
+              }, { once: true });
+            }
+          };
+          
+          // Try immediately and also listen for ready events
+          playWhenReady();
+          firstVideo.addEventListener('loadeddata', playWhenReady, { once: true });
+          
+          // Preload videos based on connection quality
+          for (let i = 1; i <= preloadCount && i < videos.length; i++) {
+            const nextVideo = videoRefs.current.get(videos[i].id);
+            if (nextVideo && !nextVideo.src) {
+              // Use 'auto' for fast connections, 'metadata' for slower ones
+              nextVideo.preload = connectionQuality === 'fast' ? 'auto' : 'metadata';
+              nextVideo.src = videos[i].url;
+              setLoadedVideos(prev => new Set(prev).add(videos[i].id));
+            }
+          }
+        }
+      });
+    }
+  }, [videos, connectionQuality, preloadCount]); // Only run when videos change
+
+  // Handle scroll to determine which video is in view and preload adjacent videos
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -43,17 +128,45 @@ export const NaiasView: React.FC<NaiasViewProps> = ({ videos, onSelectVideo }) =
       });
 
       setCurrentIndex(closestIndex);
+      
+      // Preload videos around the current one based on connection quality
+      const preloadVideo = (index: number, useAuto: boolean = false) => {
+        if (index >= 0 && index < videos.length) {
+          const video = videos[index];
+          const videoElement = videoRefs.current.get(video.id);
+          if (videoElement && !videoElement.src && !loadedVideos.has(video.id)) {
+            videoElement.preload = useAuto ? 'auto' : 'metadata';
+            videoElement.src = video.url;
+            setLoadedVideos(prev => new Set(prev).add(video.id));
+          }
+        }
+      };
+      
+      const shouldUseAutoPreload = connectionQuality === 'fast';
+      
+      // Preload current video
+      preloadVideo(closestIndex, shouldUseAutoPreload);
+      
+      // Preload next videos based on connection quality
+      for (let i = 1; i <= preloadCount && closestIndex + i < videos.length; i++) {
+        preloadVideo(closestIndex + i, shouldUseAutoPreload);
+      }
+      
+      // Preload previous video only on fast connections
+      if (connectionQuality === 'fast' && closestIndex > 0) {
+        preloadVideo(closestIndex - 1, true);
+      }
     };
 
-    container.addEventListener('scroll', handleScroll);
+    container.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll(); // Initial check
 
     return () => {
       container.removeEventListener('scroll', handleScroll);
     };
-  }, [videos, isScrolling]);
+  }, [videos, isScrolling, loadedVideos]);
 
-  // Auto-play/pause videos based on visibility
+  // Auto-play/pause videos based on visibility AND aggressive lazy loading
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -64,18 +177,65 @@ export const NaiasView: React.FC<NaiasViewProps> = ({ videos, onSelectVideo }) =
           const video = videoRefs.current.get(videoId);
           if (!video) return;
 
+          // Aggressive lazy load: set src when video is approaching viewport (negative margin = earlier loading)
+          if (entry.isIntersecting && !loadedVideos.has(videoId)) {
+            const videoData = videos.find(v => v.id === videoId);
+            if (videoData && !video.src) {
+              video.preload = 'auto'; // Full preload for instant playback
+              video.src = videoData.url;
+              setLoadedVideos(prev => new Set(prev).add(videoId));
+              
+              // Preload adjacent videos based on connection quality
+              const currentVideoIndex = videos.findIndex(v => v.id === videoId);
+              const preloadAhead = Math.max(1, preloadCount - 1); // Preload 1-2 videos ahead
+              
+              for (let i = 1; i <= preloadAhead && currentVideoIndex + i < videos.length; i++) {
+                const nextVideoId = videos[currentVideoIndex + i].id;
+                const nextVideoElement = videoRefs.current.get(nextVideoId);
+                const nextVideoData = videos[currentVideoIndex + i];
+                if (nextVideoElement && nextVideoData && !nextVideoElement.src && !loadedVideos.has(nextVideoId)) {
+                  // Use 'auto' for fast connections, 'metadata' for slower ones
+                  nextVideoElement.preload = connectionQuality === 'fast' ? 'auto' : 'metadata';
+                  nextVideoElement.src = nextVideoData.url;
+                  setLoadedVideos(prev => new Set(prev).add(nextVideoId));
+                }
+              }
+            }
+          }
+
+          // Auto-play/pause logic - wait for video to be ready
           if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
-            video.play().catch((err) => {
-              console.log('Auto-play prevented:', err);
-            });
+            if (video.src) {
+              // Wait for video to have enough data buffered before playing
+              const tryPlay = () => {
+                if (video.readyState >= 3) { // HAVE_FUTURE_DATA - enough data to play
+                  video.play().catch((err) => {
+                    console.log('Auto-play prevented:', err);
+                  });
+                } else {
+                  // Wait for canplay event if not ready yet
+                  const canPlayHandler = () => {
+                    video.play().catch((err) => {
+                      console.log('Auto-play prevented:', err);
+                    });
+                    video.removeEventListener('canplay', canPlayHandler);
+                  };
+                  video.addEventListener('canplay', canPlayHandler, { once: true });
+                }
+              };
+              tryPlay();
+            }
           } else {
             video.pause();
           }
         });
       },
       {
-        threshold: [0, 0.5, 1],
-        rootMargin: '-10% 0px -10% 0px', // Only consider videos that are mostly visible
+        threshold: [0, 0.3, 0.5, 0.7, 1],
+        // Adaptive rootMargin: earlier for fast connections, closer for slow
+        rootMargin: connectionQuality === 'fast' ? '50% 0px 50% 0px' : 
+                    connectionQuality === 'medium' ? '30% 0px 30% 0px' : 
+                    '10% 0px 10% 0px',
       }
     );
 
@@ -89,9 +249,9 @@ export const NaiasView: React.FC<NaiasViewProps> = ({ videos, onSelectVideo }) =
     return () => {
       observer.disconnect();
     };
-  }, [videos]);
+  }, [videos, loadedVideos, connectionQuality, preloadCount]);
 
-  // Handle keyboard navigation
+  // Handle keyboard navigation with aggressive preloading
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -101,6 +261,41 @@ export const NaiasView: React.FC<NaiasViewProps> = ({ videos, onSelectVideo }) =
         const nextIndex = e.key === 'ArrowDown' 
           ? Math.min(currentIndex + 1, videos.length - 1)
           : Math.max(currentIndex - 1, 0);
+        
+        // Preload video at next index before scrolling (adaptive based on connection)
+        const nextVideo = videos[nextIndex];
+        if (nextVideo) {
+          const nextVideoElement = videoRefs.current.get(nextVideo.id);
+          if (nextVideoElement && !nextVideoElement.src && !loadedVideos.has(nextVideo.id)) {
+            nextVideoElement.preload = connectionQuality === 'fast' ? 'auto' : 'metadata';
+            nextVideoElement.src = nextVideo.url;
+            setLoadedVideos(prev => new Set(prev).add(nextVideo.id));
+          }
+          
+          // Preload adjacent videos based on connection quality
+          const preloadAhead = connectionQuality === 'fast' ? 2 : connectionQuality === 'medium' ? 1 : 0;
+          
+          for (let i = 1; i <= preloadAhead && nextIndex + i < videos.length; i++) {
+            const afterNextVideo = videos[nextIndex + i];
+            const afterNextVideoElement = videoRefs.current.get(afterNextVideo.id);
+            if (afterNextVideoElement && !afterNextVideoElement.src && !loadedVideos.has(afterNextVideo.id)) {
+              afterNextVideoElement.preload = connectionQuality === 'fast' ? 'auto' : 'metadata';
+              afterNextVideoElement.src = afterNextVideo.url;
+              setLoadedVideos(prev => new Set(prev).add(afterNextVideo.id));
+            }
+          }
+          
+          // Only preload previous on fast connections
+          if (connectionQuality === 'fast' && nextIndex > 0) {
+            const prevVideo = videos[nextIndex - 1];
+            const prevVideoElement = videoRefs.current.get(prevVideo.id);
+            if (prevVideoElement && !prevVideoElement.src && !loadedVideos.has(prevVideo.id)) {
+              prevVideoElement.preload = 'auto';
+              prevVideoElement.src = prevVideo.url;
+              setLoadedVideos(prev => new Set(prev).add(prevVideo.id));
+            }
+          }
+        }
         
         const videoElement = containerRef.current?.children[nextIndex] as HTMLElement;
         if (videoElement) {
@@ -114,7 +309,7 @@ export const NaiasView: React.FC<NaiasViewProps> = ({ videos, onSelectVideo }) =
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentIndex, videos.length]);
+  }, [currentIndex, videos, loadedVideos]);
 
   if (videos.length === 0) {
     return (
@@ -142,7 +337,7 @@ export const NaiasView: React.FC<NaiasViewProps> = ({ videos, onSelectVideo }) =
           data-video-id={video.id}
           className="h-[calc(100vh-4rem)] w-full snap-start snap-always relative bg-black flex items-center justify-center"
         >
-          {/* Video */}
+          {/* Video - Lazy loaded when visible */}
           <video
             ref={(el) => {
               if (el) {
@@ -151,17 +346,62 @@ export const NaiasView: React.FC<NaiasViewProps> = ({ videos, onSelectVideo }) =
                 videoRefs.current.delete(video.id);
               }
             }}
-            src={video.url}
+            // Don't set src here - lazy load it in IntersectionObserver
             loop
             muted={isMuted}
             playsInline
+            preload="none"
+            data-video-id={video.id}
             className="w-full h-full object-contain"
+            onLoadedData={(e) => {
+              // Video has loaded enough data - ensure it's ready to play
+              const videoEl = e.currentTarget;
+              if (videoEl.readyState >= 3) {
+                // Video is ready, pause it (will auto-play when visible)
+                videoEl.pause();
+              }
+            }}
+            onCanPlay={(e) => {
+              // Video can start playing - ensure currentTime is at start
+              const videoEl = e.currentTarget;
+              if (videoEl.currentTime > 0.1) {
+                videoEl.currentTime = 0;
+              }
+            }}
+            onError={(e) => {
+              // Handle video loading errors gracefully
+              console.warn(`Video ${video.id} failed to load:`, e);
+              const videoEl = e.currentTarget;
+              // Try reloading once after a delay
+              setTimeout(() => {
+                if (!videoEl.src || videoEl.error) {
+                  const videoData = videos.find(v => v.id === video.id);
+                  if (videoData) {
+                    videoEl.load(); // Reload the video
+                  }
+                }
+              }, 2000);
+            }}
             onClick={(e) => {
-              const video = e.currentTarget;
-              if (video.paused) {
-                video.play();
+              const videoEl = e.currentTarget;
+              // Load video if not already loaded and user clicks
+              if (!videoEl.src) {
+                const videoData = videos.find(v => v.id === video.id);
+                if (videoData) {
+                  videoEl.preload = 'auto';
+                  videoEl.src = videoData.url;
+                  setLoadedVideos(prev => new Set(prev).add(video.id));
+                  // Wait for video to be ready before playing
+                  videoEl.addEventListener('canplay', () => {
+                    videoEl.play().catch(() => {});
+                  }, { once: true });
+                  return;
+                }
+              }
+              if (videoEl.paused) {
+                videoEl.play().catch(() => {});
               } else {
-                video.pause();
+                videoEl.pause();
               }
             }}
           />
